@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Commande Carte NFC - SparkLink</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://paytech.sn/cdn/paytech.min.css">
+    <script src="https://paytech.sn/cdn/paytech.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #2a538b;
+            margin: 0;
+            padding: 20px;
+            justify-content: center;
+            display: flex;
+            align-items: center;
+            height: 100vh;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        label {
+            display: block;
+            margin: 15px 0 5px;
+            color: #333;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background-color: #2a538b;
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+
+        button[disabled] {
+            background-color: #aaa;
+            cursor: not-allowed;
+        }
+
+        .loader {
+            display: none;
+            margin: 10px auto;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #2a538b;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+<form id="nfcForm">
+    <h2 style="text-align:center;">Commande de Carte NFC</h2>
+
+    <label for="fullName">Nom Complet (Prénom Nom) :</label>
+    <input type="text" id="fullName" placeholder="ex: Jean Dupont">
+
+    <label for="pattern">Motif :</label>
+    <select id="pattern">
+        <option value="" disabled selected>-- Sélectionner un motif --</option>
+        <option value="Badge">Badge</option>
+        <option value="Carte">Carte</option>
+    </select>
+
+    <label for="phone">Téléphone :</label>
+    <input type="tel" id="phone" placeholder="772457199">
+
+    <label for="amount">Montant (XOF) :</label>
+    <input type="number" id="amount" placeholder="5000">
+
+    <label for="tp">Moyen de paiement :</label>
+    <select id="tp">
+        <option value="" disabled selected>-- Sélectionner --</option>
+        <option value="Orange Money">Orange Money</option>
+        <option value="Wave">Wave</option>
+        <option value="Tigo Cash">Free Money Mix by Yass</option>
+        <option value="Wizall">Wizall</option>
+        <option value="Carte Bancaire">Carte Bancaire</option>
+    </select>
+
+    <div class="loader" id="loader"></div>
+
+    <button type="button" onclick="validateAndPay()" id="payBtn">Payer et Commander</button>
+</form>
+
+<script>
+    const PAYTECH_JSONP_URL = 'https://script.google.com/macros/s/AKfycbx3Lrj6_O1J5SlQ_5ARLzlq-_r_hkxuV8EwUwfQufilYfSCDTq62SnPSmsOx8jsKCKZ/exec';
+
+    function validateAndPay() {
+        setTimeout(() => {
+            const btn = document.getElementById("payBtn");
+            const loader = document.getElementById("loader");
+
+            const fields = {
+                "Nom complet": document.getElementById("fullName").value.trim(),
+                "Motif": document.getElementById("pattern").value,
+                "Téléphone": document.getElementById("phone").value.trim(),
+                "Montant": document.getElementById("amount").value.trim(),
+                "Moyen de paiement": document.getElementById("tp").value
+            };
+
+            const missing = [];
+
+            for (const [label, value] of Object.entries(fields)) {
+                if (!value) {
+                    missing.push(label);
+                }
+            }
+
+            if (missing.length > 0) {
+                alert("Veuillez remplir les champs suivants :\n- " + missing.join("\n- "));
+                return;
+            }
+
+            const phone = fields["Téléphone"];
+            const fullName = fields["Nom complet"];
+            const phoneValid = /^7[05678]\d{7}$/.test(phone);
+            const nameValid = /^[^\d\s]+ [^\d\s]+$/.test(fullName);
+
+            if (!phoneValid) {
+                alert("Numéro invalide. Format attendu : 772457199");
+                return;
+            }
+
+            if (!nameValid) {
+                alert("Nom complet invalide. Format : Prénom Nom");
+                return;
+            }
+
+            // UI
+            btn.disabled = true;
+            loader.style.display = "block";
+
+            const motif = fields["Motif"];
+            const montant = fields["Montant"];
+            const tp = fields["Moyen de paiement"];
+
+            const callback = "handlePayTechResponse";
+            const url = `${PAYTECH_JSONP_URL}?motif=${encodeURIComponent(motif)}&montant=${montant}&telephone=${phone}&full_name=${encodeURIComponent(fullName)}&tp=${encodeURIComponent(tp)}&callback=${callback}`;
+
+            const script = document.createElement("script");
+            script.src = url;
+            document.body.appendChild(script);
+        }, 0);
+    }
+
+    function handlePayTechResponse(response) {
+        const btn = document.getElementById("payBtn");
+        const loader = document.getElementById("loader");
+
+        loader.style.display = "none";
+        btn.disabled = false;
+
+        console.log(response);
+
+        if (response.success === 1 && response.redirect_url) {
+            new PayTech({}).withOption({
+                tokenUrl: response.redirect_url,
+                prensentationMode: PayTech.OPEN_IN_POPUP
+            }).send();
+        } else {
+            alert("Erreur PayTech: " + (response.error || "inconnue"));
+            console.error(response);
+        }
+    }
+</script>
+
+</body>
+</html>
